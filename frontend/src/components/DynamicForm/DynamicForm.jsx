@@ -154,11 +154,12 @@ const DynamicForm = () => {
             <Button type="primary" htmlType="submit">
               Submit
             </Button>
+            
           </Form.Item>
         </Form>
       </Card>
 
-      {/* <Card title={`${collectionName} Data`} style={{ marginTop: 16 }}>
+      {/* <Card title={`${collectionName} Data`} style={{ marginTop: 16 }}  >
         <Table
           loading={tableLoading}
           columns={getColumns()}
