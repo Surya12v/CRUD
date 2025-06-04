@@ -14,12 +14,15 @@ connectDB(); // Connect to MongoDB
 const User = require('./models/User'); // Import User model
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL,
+  credentials: true
+}));
 app.use(express.json());
 
 // Routes
 app.use('/api/users', userRoutes);
-app.use('/api/formbuilders', FormBuilderRoutes);
+app.use('/api/formbuilders', FormBuilderRoutes); // Ensure this matches frontend config
 app.use('/api/dynamic', dynamicRoutes);
 
 // Start the server

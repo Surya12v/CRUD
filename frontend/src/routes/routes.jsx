@@ -26,6 +26,10 @@ export const routes = [
     element: <DynamicForm />,
   },
   {
+    path: '/dynamic/:collectionName/:id',  // Add new route for editing
+    element: <DynamicForm />,
+  },
+  {
     path: '/users',
     element: <UserForm />,
   },
