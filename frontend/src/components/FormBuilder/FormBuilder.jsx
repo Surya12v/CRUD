@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Input, Button, Card, Select, Space, Switch, message, Table } from 'antd';
+import { Form, Input, Button, Card, Select, Space, Switch, message, Table, Typography, Popconfirm } from 'antd';
 import axios from 'axios';
 import { config } from '../../config';
 
 const { Option } = Select;
+const { Title } = Typography;
 
 const FormBuilder = () => {
   const [formConfig, setFormConfig] = useState({
@@ -12,6 +13,7 @@ const FormBuilder = () => {
   });
   const [savedForms, setSavedForms] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState('list'); // 'list' | 'add' | 'edit'
 
   const fieldTypes = [
     { label: 'Text', value: 'text' },
@@ -56,7 +58,14 @@ const FormBuilder = () => {
       render: (_, record) => (
         <Space>
           <Button type="link" onClick={() => handleEdit(record)}>Edit</Button>
-          <Button type="link" danger onClick={() => handleDelete(record._id)}>Delete</Button>
+          <Popconfirm
+            title="Delete this form configuration?"
+            onConfirm={() => handleDelete(record._id)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <Button type="link" danger>Delete</Button>
+          </Popconfirm>
         </Space>
       ),
     }
@@ -86,6 +95,7 @@ const FormBuilder = () => {
 
   const handleEdit = (record) => {
     setFormConfig(record);
+    setMode('edit');
   };
 
   const handleDelete = async (id) => {
@@ -106,91 +116,128 @@ const FormBuilder = () => {
       if (formConfig.schema.length === 0) {
         return message.error('At least one field is required');
       }
-
-      if (formConfig._id) {
-        // Update existing form
-        await axios.put(`${config.endpoints.formBuilder}/${formConfig._id}`, formConfig);
-        message.success('Form configuration updated successfully');
-      } else {
-        // Create new form
-        await axios.post(config.endpoints.formBuilder, formConfig);
-        message.success('Form configuration saved successfully');
+      // Validate schema fields
+      const invalidFields = formConfig.schema.filter(
+        field => !field.field || !field.label || !field.type
+      );
+      if (invalidFields.length > 0) {
+        return message.error('All fields must have name, label and type');
       }
-      
+      const endpoint = formConfig._id 
+        ? `${config.endpoints.formBuilder}/${formConfig._id}`
+        : config.endpoints.formBuilder;
+      const method = formConfig._id ? 'put' : 'post';
+      await axios[method](endpoint, formConfig);
+      message.success(`Form configuration ${formConfig._id ? 'updated' : 'saved'} successfully`);
       fetchSavedForms();
       setFormConfig({ collectionName: '', schema: [] });
+      setMode('list');
     } catch (error) {
       message.error(error.response?.data?.message || 'Operation failed');
     }
   };
 
-  return (
-    <>
-      <Card title="Form Builder">
-        <Form layout="vertical">
-          <Form.Item label="Collection Name" required>
-            <Input 
-              value={formConfig.collectionName}
-              placeholder="Enter collection name"
-              onChange={(e) => setFormConfig({...formConfig, collectionName: e.target.value})}
-            />
-          </Form.Item>
+  const handleAddNew = () => {
+    setFormConfig({ collectionName: '', schema: [] });
+    setMode('add');
+  };
 
-          {formConfig.schema.map((field, index) => (
-            <Card key={index} size="small" style={{ marginBottom: 16 }}>
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Input
-                  placeholder="Field name"
-                  value={field.field}
-                  onChange={(e) => handleFieldChange(index, 'field', e.target.value)}
-                />
-                <Input
-                  placeholder="Label"
-                  value={field.label}
-                  onChange={(e) => handleFieldChange(index, 'label', e.target.value)}
-                />
-                <Select
-                  value={field.type}
-                  onChange={(value) => handleFieldChange(index, 'type', value)}
-                  style={{ width: '100%' }}
-                >
-                  {fieldTypes.map(type => (
-                    <Option key={type.value} value={type.value}>{type.label}</Option>
-                  ))}
-                </Select>
-                <Space>
-                  <span>Required:</span>
-                  <Switch
-                    checked={field.required}
-                    onChange={(checked) => handleFieldChange(index, 'required', checked)}
-                  />
-                </Space>
-                {field.type === 'select' && (
-                  <Input
-                    placeholder="Options (comma-separated)"
-                    onChange={(e) => handleFieldChange(index, 'options', e.target.value.split(','))}
-                  />
-                )}
-              </Space>
-            </Card>
-          ))}
+  const handleBack = () => {
+    setFormConfig({ collectionName: '', schema: [] });
+    setMode('list');
+  };
 
+  // --- UI ---
+  if (mode === 'list') {
+    return (
+      <Card
+        title={
           <Space>
-            <Button type="dashed" onClick={addField}>Add Field</Button>
-            <Button type="primary" onClick={saveFormConfig}>Save Form Configuration</Button>
+            <Title level={4} style={{ margin: 0 }}>Form Configurations</Title>
+            <Button type="primary" onClick={handleAddNew}>Add New Form</Button>
           </Space>
-        </Form>
-      </Card>
-
-      {/* <Card title="Saved Form Configurations" style={{ marginTop: 16 }}>
+        }
+      >
         <Table
           loading={loading}
           dataSource={savedForms}
           columns={columns}
           rowKey="_id"
         />
-      </Card> */}
-    </>
+      </Card>
+    );
+  }
+
+  // Add/Edit mode
+  return (
+    <Card
+      title={
+        <Space>
+          <Title level={4} style={{ margin: 0 }}>
+            {mode === 'edit' ? 'Edit Form Configuration' : 'Add New Form Configuration'}
+          </Title>
+          <Button onClick={handleBack}>Back to List</Button>
+        </Space>
+      }
+    >
+      <Form layout="vertical">
+        <Form.Item label="Collection Name" required>
+          <Input 
+            value={formConfig.collectionName}
+            placeholder="Enter collection name"
+            onChange={(e) => setFormConfig({...formConfig, collectionName: e.target.value})}
+            disabled={!!formConfig._id}
+          />
+        </Form.Item>
+
+        {formConfig.schema.map((field, index) => (
+          <Card key={index} size="small" style={{ marginBottom: 16 }}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Input
+                placeholder="Field name"
+                value={field.field}
+                onChange={(e) => handleFieldChange(index, 'field', e.target.value)}
+              />
+              <Input
+                placeholder="Label"
+                value={field.label}
+                onChange={(e) => handleFieldChange(index, 'label', e.target.value)}
+              />
+              <Select
+                value={field.type}
+                onChange={(value) => handleFieldChange(index, 'type', value)}
+                style={{ width: '100%' }}
+              >
+                {fieldTypes.map(type => (
+                  <Option key={type.value} value={type.value}>{type.label}</Option>
+                ))}
+              </Select>
+              <Space>
+                <span>Required:</span>
+                <Switch
+                  checked={field.required}
+                  onChange={(checked) => handleFieldChange(index, 'required', checked)}
+                />
+              </Space>
+              {field.type === 'select' && (
+                <Input
+                  placeholder="Options (comma-separated)"
+                  value={field.options?.join(',')}
+                  onChange={(e) => handleFieldChange(index, 'options', e.target.value.split(','))}
+                />
+              )}
+            </Space>
+          </Card>
+        ))}
+
+        <Space>
+          <Button type="dashed" onClick={addField}>Add Field</Button>
+          <Button type="primary" onClick={saveFormConfig}>
+            {mode === 'edit' ? 'Update' : 'Save'} Form Configuration
+          </Button>
+        </Space>
+      </Form>
+    </Card>
   );
 };
 
